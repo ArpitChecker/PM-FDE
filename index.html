@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Breltz Returns Loop</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* Layout idea: an ops console for the Breltz team on top, the customer screens it changes underneath, one tab per root cause. */
+:root{
+  --ink:#16302e;
+  --muted:#5b6f6c;
+  --paper:#f4f6f5;
+  --card:#ffffff;
+  --line:#dbe3e1;
+  --accent:#1f6b64;
+  --accent-soft:#dcefec;
+  --good:#2e7d4f; --good-soft:#e1f2e7;
+  --warn:#a76a00; --warn-soft:#fbefd6;
+  --crit:#b3332a; --crit-soft:#f8e1de;
+  --display:"Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --body:"IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --mono:"IBM Plex Mono", ui-monospace, Menlo, monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ink:#e3eeec; --muted:#9bb0ac; --paper:#0f1a19; --card:#162523; --line:#294140;
+    --accent:#5cc2b6; --accent-soft:#1d3a37;
+    --good:#6fcf97; --good-soft:#1b3326; --warn:#f0b54a; --warn-soft:#3a2c12; --crit:#f08a80; --crit-soft:#3d1f1c;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --ink:#e3eeec; --muted:#9bb0ac; --paper:#0f1a19; --card:#162523; --line:#294140;
+  --accent:#5cc2b6; --accent-soft:#1d3a37;
+  --good:#6fcf97; --good-soft:#1b3326; --warn:#f0b54a; --warn-soft:#3a2c12; --crit:#f08a80; --crit-soft:#3d1f1c;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--paper);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.5}
+h1,h2,h3{font-family:var(--display);text-wrap:balance;margin:0;line-height:1.15}
+h1{font-size:28px;font-weight:700}
+h2{font-size:21px;font-weight:700}
+h3{font-size:16px;font-weight:700}
+p{margin:0}
+.wrap{max-width:1180px;margin:0 auto;padding:0 20px}
+header{border-bottom:1px solid var(--line);background:var(--card)}
+.head{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:flex-end;justify-content:space-between;padding:20px 0 14px}
+.brand small{display:block;color:var(--muted);font-size:13px;margin-top:4px}
+.sample-note{font-size:12.5px;color:var(--muted);max-width:420px}
+.pill-sample{display:inline-block;font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;padding:1px 7px;border-radius:999px;background:var(--warn-soft);color:var(--warn);vertical-align:middle}
+.pill-call{display:inline-block;font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;padding:1px 7px;border-radius:999px;background:var(--accent-soft);color:var(--accent);vertical-align:middle}
+nav{display:flex;gap:4px;overflow-x:auto;padding-bottom:0}
+nav a{flex:0 0 auto;text-decoration:none;color:var(--muted);font-weight:500;font-size:14px;padding:10px 14px;border-bottom:3px solid transparent}
+nav a .n{font-family:var(--mono);font-size:12px;margin-right:6px;opacity:.7}
+nav a[aria-current="page"]{color:var(--ink);border-bottom-color:var(--accent)}
+nav a:hover{color:var(--ink)}
+a:focus-visible,button:focus-visible,select:focus-visible,textarea:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+main{padding:24px 0 60px}
+section.view{display:none;flex-direction:column;gap:20px}
+section.view.on{display:flex}
+.lede{display:flex;flex-direction:column;gap:6px;max-width:780px}
+.lede p{color:var(--muted)}
+.grid{display:grid;gap:16px}
+.g4{grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
+.g2{grid-template-columns:repeat(auto-fit,minmax(340px,1fr))}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:18px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.tile .big{font-family:var(--display);font-size:30px;font-weight:700;font-variant-numeric:tabular-nums}
+.tile .big .arrow{color:var(--muted);font-weight:500;font-size:20px;margin:0 6px}
+.tile .big .to{color:var(--accent)}
+.tile p{font-size:13px;color:var(--muted)}
+.tile .lab{font-size:13px;font-weight:600}
+.muted{color:var(--muted)}
+.small{font-size:13px}
+.stack{display:flex;height:34px;border-radius:6px;overflow:hidden;font-size:12.5px;font-weight:600}
+.stack div{display:flex;align-items:center;padding:0 10px;white-space:nowrap;overflow:hidden}
+.legend{display:flex;flex-wrap:wrap;gap:8px 18px;font-size:13px}
+.legend span::before{content:"";display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;background:var(--c)}
+.bars{display:flex;flex-direction:column;gap:8px}
+.bar{display:grid;grid-template-columns:200px 1fr 44px;gap:10px;align-items:center;font-size:13.5px}
+.bar .track{height:14px;background:var(--paper);border-radius:4px;overflow:hidden}
+.bar .fill{height:100%;border-radius:4px}
+.bar .v{font-family:var(--mono);font-size:12.5px;text-align:right}
+.tag{display:inline-block;font-size:11.5px;font-weight:600;padding:2px 8px;border-radius:999px;white-space:nowrap}
+.t-exp{background:var(--crit-soft);color:var(--crit)}
+.t-pol{background:var(--warn-soft);color:var(--warn)}
+.t-oth{background:var(--paper);color:var(--muted);border:1px solid var(--line)}
+.t-good{background:var(--good-soft);color:var(--good)}
+.scroll{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+th{text-align:left;font-weight:600;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.04em;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:10px;border-bottom:1px solid var(--line);vertical-align:top}
+td.num,th.num{text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+.heat td.cell{text-align:center;font-family:var(--mono);font-weight:500;border-radius:4px}
+.heat{border-collapse:separate;border-spacing:4px}
+.heat td{border:none}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:10px 14px;border-radius:0 8px 8px 0;font-size:13.5px}
+.callout.crit{border-color:var(--crit);background:var(--crit-soft)}
+.findings{display:flex;flex-direction:column;gap:10px;margin:0;padding:0;list-style:none}
+.findings li{display:grid;grid-template-columns:22px 1fr;gap:8px;font-size:14px}
+.findings li b.k{font-family:var(--mono);color:var(--accent)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--card)}
+.seg button{font:inherit;font-size:13.5px;font-weight:500;border:0;background:transparent;color:var(--muted);padding:8px 14px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
+.btn{font:inherit;font-size:13.5px;font-weight:600;border:1px solid var(--accent);background:var(--accent);color:#fff;padding:8px 14px;border-radius:8px;cursor:pointer}
+:root[data-theme="dark"] .btn{color:#0f1a19}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .btn{color:#0f1a19}}
+.btn.ghost{background:transparent;color:var(--accent)}
+.roas{display:flex;flex-direction:column;gap:3px;min-width:150px}
+.roas .r{display:grid;grid-template-columns:1fr 40px;gap:6px;align-items:center}
+.roas .r i{display:block;height:7px;border-radius:3px}
+.roas .r span{font-family:var(--mono);font-size:12px;text-align:right}
+.rowflag{display:flex;align-items:center;gap:6px}
+#adTable td:first-child{min-width:230px}
+.rank{font-family:var(--mono);color:var(--muted);font-size:12px;width:18px;display:inline-block}
+.move{font-family:var(--mono);font-size:11.5px}
+.move.up{color:var(--good)} .move.down{color:var(--crit)}
+label{font-size:13px;font-weight:600;display:block;margin-bottom:4px}
+select,textarea,input[type="text"]{font:inherit;font-size:14px;width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink)}
+textarea{min-height:70px;resize:vertical}
+.field{display:flex;flex-direction:column}
+.check{display:flex;gap:8px;align-items:center;font-size:14px;font-weight:500}
+.check input{width:16px;height:16px}
+.results{display:flex;flex-direction:column;gap:8px;margin:0;padding:0;list-style:none}
+.results li{display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:start;font-size:14px;padding:10px 12px;border-radius:8px;border:1px solid var(--line)}
+.results li.fail{background:var(--crit-soft);border-color:transparent}
+.results li.warn{background:var(--warn-soft);border-color:transparent}
+.results li.pass{background:var(--good-soft);border-color:transparent}
+.verdict{font-family:var(--display);font-weight:700;font-size:17px;text-align:right}
+.spec dl{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:0;font-size:14px}
+.spec dt{color:var(--muted)}
+.spec dd{margin:0;font-weight:500}
+.phones{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:24px;align-items:start}
+.phone-col{display:flex;flex-direction:column;gap:10px;align-items:center}
+.phone-col .cap{max-width:360px;font-size:13.5px;color:var(--muted);text-align:center}
+.phone{width:340px;max-width:100%;border:10px solid #1c2726;border-radius:34px;background:#fff;color:#1b2422;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,.12)}
+.phone .bar-top{height:26px;display:flex;justify-content:center;align-items:center}
+.phone .bar-top i{width:90px;height:6px;border-radius:4px;background:#d8dddc}
+.screen{height:600px;overflow-y:auto;padding:4px 16px 20px;display:flex;flex-direction:column;gap:14px;font-size:14px}
+.screen h4{margin:0;font-family:var(--display);font-size:17px}
+.screen .sub{font-size:12.5px;color:#5f6b69}
+.pdp-img{height:150px;border-radius:12px;display:flex;align-items:flex-end;justify-content:space-between;padding:10px;color:#fff;font-size:12px;font-weight:600;transition:background .3s}
+.box{border:1px solid #e1e6e5;border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:10px}
+.box .t{font-weight:600;font-size:14px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font:inherit;font-size:13px;border:1px solid #cfd8d6;background:#fff;color:#1b2422;border-radius:999px;padding:6px 11px;cursor:pointer}
+.chip[aria-pressed="true"]{background:#1b2422;color:#fff;border-color:#1b2422}
+.fit{border-radius:10px;padding:10px 12px;font-size:13.5px}
+.fit.ok{background:#e1f2e7;color:#1f5a38}
+.fit.tight{background:#fbefd6;color:#7a4e00}
+.fit b{display:block;font-size:14.5px;margin-bottom:2px}
+.phone select{background:#fff;color:#1b2422;border-color:#cfd8d6}
+.swatches{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.sw{height:54px;border-radius:8px;display:flex;align-items:flex-end;padding:5px;font-size:10.5px;font-weight:600;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.35)}
+.pbtn{font:inherit;font-size:14px;font-weight:600;border-radius:10px;padding:11px;border:1px solid #1b2422;cursor:pointer;width:100%}
+.pbtn.dark{background:#1b2422;color:#fff}
+.pbtn.light{background:#fff;color:#1b2422}
+.order{display:grid;grid-template-columns:54px 1fr;gap:10px;align-items:center}
+.order .thumb{height:54px;border-radius:8px}
+.step-k{font-size:11.5px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:#6f7b79}
+.record{font-family:var(--mono);font-size:12px;background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:12px;white-space:pre-wrap;overflow-x:auto;margin:0;color:var(--ink)}
+.diagram{width:100%;height:auto;display:block}
+.diagram text{font-family:var(--body);fill:var(--ink)}
+.diagram .m{fill:var(--muted)}
+.diagram rect.n{fill:var(--card);stroke:var(--line)}
+.diagram rect.h{fill:var(--accent-soft);stroke:var(--accent)}
+.diagram rect.o{fill:var(--card);stroke:var(--accent)}
+.diagram path{stroke:var(--muted);fill:none;stroke-width:1.4}
+.timeline{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+.timeline .card .wk{font-family:var(--mono);font-size:12px;color:var(--accent);font-weight:500}
+.owners{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+@media (max-width:560px){
+  .bar{grid-template-columns:120px 1fr 40px}
+  h1{font-size:23px}
+}
+@media (prefers-reduced-motion: reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <div class="head">
+      <div class="brand">
+        <h1>Breltz Returns Loop</h1>
+        <small>Prototype for Breltz Bags, built from the 26 Nov discovery call</small>
+        <svg width="90" height="14" aria-hidden="true" style="display:block"><text x="0" y="11" font-size="10" fill="none" stroke="none">Slopless101</text></svg>
+      </div>
+      <p class="sample-note"><span class="pill-call">From call</span> marks figures the Breltz team gave on the call. <span class="pill-sample">Sample</span> marks illustrative numbers. The pilot replaces them with your own data joined by order ID.</p>
+    </div>
+    <nav aria-label="Prototype sections">
+      <a href="#overview"><span class="n">01</span>Why bags come back</a>
+      <a href="#creatives"><span class="n">02</span>Ads after returns</a>
+      <a href="#claims"><span class="n">03</span>Claim check</a>
+      <a href="#customer"><span class="n">04</span>Customer screens</a>
+      <a href="#loop"><span class="n">05</span>How it connects</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+
+<!-- 01 OVERVIEW -->
+<section class="view" id="v-overview">
+  <div class="lede">
+    <h2>Why bags come back</h2>
+    <p>The Monday view. One number per problem, reasons you can count, and the cuts nobody has today: by SKU, colour, channel and customer type.</p>
+  </div>
+
+  <div class="grid g4">
+    <div class="card tile">
+      <span class="lab">Website returns after delivery <span class="pill-call">From call</span></span>
+      <div class="big">21 to 22%<span class="arrow">→</span><span class="to">12%</span></div>
+      <p>Aditya's target, within two quarters, without cutting growth.</p>
+    </div>
+    <div class="card tile">
+      <span class="lab">Contribution margin <span class="pill-call">From call</span></span>
+      <div class="big">9%<span class="arrow">→</span><span class="to">18%</span></div>
+      <p>Down from about 22% two years ago while revenue grew about 40%.</p>
+    </div>
+    <div class="card tile">
+      <span class="lab">Commuter returns graded A <span class="pill-call">From call</span></span>
+      <div class="big">75 to 80%</div>
+      <p>Unused, tags intact. Only 4 to 5% damaged in transit. Manufacturing defects cannot explain most returns.</p>
+    </div>
+    <div class="card tile">
+      <span class="lab">Cost per return <span class="pill-call">From call</span></span>
+      <div class="big">₹140 to 180</div>
+      <p>Reverse pickup alone, before QC, repacking, 12% sold as seconds at 40% off, and 8 to 10 days of stuck stock.</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>The 30% dashboard number is two different problems</h3>
+    <p class="small muted">Per 100 website orders, worked out from the call: COD is 35% of orders and 17 to 18% of COD is refused (RTO). About 21 to 22% come back after delivery. Assumption: that rate is a share of delivered orders; the call did not say. The 30% dashboard figure covers all channels, so it will not match this website-only split exactly.</p>
+    <div class="stack" role="img" aria-label="Per 100 website orders: 74 kept, 20 returned after delivery, 6 refused at the door">
+      <div style="flex:74;background:var(--good-soft);color:var(--good)">74 kept</div>
+      <div style="flex:20;background:var(--crit-soft);color:var(--crit)">20 returned</div>
+      <div style="flex:6;background:var(--warn-soft);color:var(--warn)">6 RTO</div>
+    </div>
+    <div class="legend">
+      <span style="--c:var(--crit)"><b>Returned after delivery:</b> mostly an expectation problem. This prototype goes after it.</span>
+      <span style="--c:var(--warn)"><b>RTO:</b> a COD delivery problem. Keep it on its own line; the COD fee and pincode exclusions already address it. Whether COD buyers also return more after delivery is still untested (see the payment cut below).</span>
+    </div>
+  </div>
+
+  <div class="callout"><b>The redesign is part of the story.</b> In February the Commuter 30 (more volume, zip-in sleeve, took a 16-inch laptop easily) became the slimmer Commuter 28L, officially 15.6-inch. Since March an ad overlay says 16-inch, the top video shows a small laptop, and Myntra still shows the old bag. The product changed; much of the marketing still sells the old one.</div>
+
+  <div class="grid g2">
+    <div class="card">
+      <h3>Commuter 28L: why customers return it <span class="pill-sample">Sample</span></h3>
+      <p class="small muted">Captured by the new return flow (screen 04) instead of "Didn't like the product". Ticket phrases Pooja quoted map to these reasons.</p>
+      <div class="bars" id="reasonBars"></div>
+      <div class="legend">
+        <span style="--c:var(--crit)">Expectation gap, created before purchase</span>
+        <span style="--c:var(--warn)">Return policy behaviour</span>
+        <span style="--c:var(--muted)">Product or fulfilment</span>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Return rate by SKU and channel <span class="pill-sample">Sample</span></h3>
+      <p class="small muted">Channel averages match the call: website 21 to 22%, Myntra about 31%, Amazon 13 to 14%.</p>
+      <div class="scroll">
+        <table class="heat" id="heat"></table>
+      </div>
+      <div class="callout crit"><b>Myntra:</b> the Commuter listing still shows the old Commuter 30 with the zip-in sleeve, and the title likely says 30 litres. Customers get a different bag from the one they saw. Some of Myntra's gap is also how people shop there, so the listing fix will narrow it, not close it.</div>
+    </div>
+  </div>
+
+  <div class="grid g2">
+    <div class="card">
+      <h3>Return rate by customer and payment type <span class="pill-sample">Sample</span></h3>
+      <p class="small muted">Cuts nobody has today. School bags, bought mostly by repeat parents via WhatsApp, almost never come back. The payment cut tests Sneha's view that COD buyers are less serious after delivery too, not only at the door.</p>
+      <div class="bars">
+        <div class="bar"><span>First-time buyers</span><div class="track"><div class="fill" style="width:87%;background:var(--crit)"></div></div><span class="v">26%</span></div>
+        <div class="bar"><span>Repeat buyers</span><div class="track"><div class="fill" style="width:27%;background:var(--good)"></div></div><span class="v">8%</span></div>
+        <div class="bar"><span>COD, delivered orders</span><div class="track"><div class="fill" style="width:80%;background:var(--warn)"></div></div><span class="v">24%</span></div>
+        <div class="bar"><span>Prepaid orders</span><div class="track"><div class="fill" style="width:67%;background:var(--warn)"></div></div><span class="v">20%</span></div>
+      </div>
+    </div>
+    <div class="card">
+      <h3>This week's findings for Monday <span class="pill-sample">Sample</span></h3>
+      <ul class="findings">
+        <li><b class="k">1</b><span>Laptop-fit returns are 3x higher on orders from the "Fits up to 16-inch" carousel than on other Commuter orders. The bag is officially 15.6-inch.</span></li>
+        <li><b class="k">2</b><span>Dusty Rose "colour looks different" returns cluster on orders using code ANANYA15, from the sunset reel.</span></li>
+        <li><b class="k">3</b><span>12% of sale-period returns are one of two colours ordered together. Free prepaid returns make this cost the customer nothing.</span></li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- 02 CREATIVES -->
+<section class="view" id="v-creatives">
+  <div class="lede">
+    <h2>Ads after returns</h2>
+    <p>Meta only ever hears about the purchase, so it keeps scaling the ads that sell the most, including the ones that sell the wrong expectation. Here each ad is scored on revenue the business keeps.</p>
+  </div>
+
+  <div class="card">
+    <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between">
+      <div class="seg" role="group" aria-label="Ranking">
+        <button type="button" id="rankMeta" aria-pressed="false">Rank as Meta reports it</button>
+        <button type="button" id="rankNet" aria-pressed="true">Rank after returns</button>
+      </div>
+      <span class="small muted">Commuter and Voyager ads, last 30 days <span class="pill-sample">Sample</span></span>
+    </div>
+    <div class="scroll">
+      <table id="adTable">
+        <thead><tr>
+          <th>Ad</th><th>Matched by</th><th>ROAS: reported vs kept</th><th class="num">Returned</th><th class="num">RTO</th><th>Top return reason</th><th>Suggested action</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <p class="small muted">Kept-revenue ROAS = Meta-reported ROAS × (1 − return rate − RTO rate). Three limits: the two rates are measured on slightly different bases (delivered vs all orders); Meta's own attribution (7-day click, 1-day view) already credits Meta with more orders than Shopify can trace, so this figure is still optimistic; and reverse pickup, repacking and seconds markdowns are not subtracted yet. Use it to rank ads against each other, not as a P&amp;L number.</p>
+  </div>
+
+  <div class="grid g2">
+    <div class="card">
+      <h3>How each ad gets matched to its returns</h3>
+      <ul class="findings">
+        <li><b class="k">1</b><span><b>Creator codes</b> (RIYA15, ANANYA15) already sit on the Shopify order. The cleanest signal you have.</span></li>
+        <li><b class="k">2</b><span><b>Ad ID in the link:</b> add <code>utm_content={{ad.id}}</code> to every Meta ad from day one so even non-code orders carry the ad. Past orders stay partly unmatched: only about 40% of Shopify orders have a source today.</span></li>
+        <li><b class="k">3</b><span><b>Post-purchase survey</b> as a fallback, with "Instagram" and "Influencer" split into "an ad" and "a creator I follow".</span></li>
+        <li><b class="k">4</b><span>Order ID then links to Farhan's weekly returns sheet and the reason from the return flow.</span></li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Scaling rules</h3>
+      <div class="scroll"><table>
+        <thead><tr><th></th><th>Today</th><th>Proposed</th></tr></thead>
+        <tbody>
+          <tr><td>Signal</td><td>Meta-reported ROAS, 7-day click, 1-day view</td><td>Kept-revenue ROAS, once the return window closes</td></tr>
+          <tr><td>Scale</td><td>Above 3x</td><td>Above the kept-revenue line set in the pilot</td></tr>
+          <tr><td>Kill</td><td>Below 1.8x for a week</td><td>Same rule on kept revenue, or a claim-check failure</td></tr>
+          <tr><td>What Meta optimises for</td><td>Every purchase counts in full</td><td>Return-adjusted purchase value: order value × expected keep rate for that SKU and colour, sent through the Conversions API at purchase time. Refunds are also sent with the order ID, for reporting.</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+  </div>
+</section>
+
+<!-- 03 CLAIMS -->
+<section class="view" id="v-claims">
+  <div class="lede">
+    <h2>Claim check before approval</h2>
+    <p>New creatives go live every week after a WhatsApp approval, and nobody from product checks the copy. This check compares every ad and listing with one spec sheet before Sneha approves it.</p>
+  </div>
+
+  <div class="grid g2">
+    <div class="card">
+      <h3>New ad for approval</h3>
+      <div class="field"><label for="cProduct">Product</label>
+        <select id="cProduct"><option value="commuter">Commuter 28L</option></select></div>
+      <div class="field"><label for="cCopy">Ad copy and text overlays</label>
+        <textarea id="cCopy">Fits up to 16-inch laptops. Your whole office day in one bag.</textarea></div>
+      <div class="grid" style="grid-template-columns:1fr 1fr;gap:12px">
+        <div class="field"><label for="cLaptop">Laptop shown in the video</label>
+          <select id="cLaptop">
+            <option value="13">13-inch (e.g. MacBook Air 13)</option>
+            <option value="15.6">15.6-inch</option>
+            <option value="16">16-inch</option>
+            <option value="none">No laptop shown</option>
+          </select></div>
+        <div class="field"><label for="cColour">Colour featured</label>
+          <select id="cColour">
+            <option>Black</option><option>Sage Green</option><option selected>Dusty Rose</option>
+          </select></div>
+      </div>
+      <div class="field"><label for="cGrade">Colour grading</label>
+        <select id="cGrade">
+          <option value="none">None, natural light</option>
+          <option value="warm" selected>Warm filter or golden hour</option>
+        </select></div>
+      <label class="check"><input type="checkbox" id="cScale"> A size reference is visible (bag on a person, height stated)</label>
+      <div><button class="btn" type="button" id="runCheck">Run claim check</button></div>
+    </div>
+
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap">
+        <h3>Result</h3><span class="verdict" id="verdict"></span>
+      </div>
+      <ul class="results" id="results"></ul>
+    </div>
+  </div>
+
+  <div class="grid g2">
+    <div class="card spec">
+      <h3>Spec sheet: the single source of truth</h3>
+      <dl>
+        <dt>Product</dt><dd>Commuter 28L (v2, launched February)</dd>
+        <dt>Volume</dt><dd>28 litres</dd>
+        <dt>Laptop</dt><dd>Officially up to 15.6-inch, built-in padded compartment</dd>
+        <dt>16-inch</dt><dd>Goes in tight; the zip strains. Do not claim.</dd>
+        <dt>Not this bag</dt><dd>Zip-in laptop sleeve and 30 litres belong to the old Commuter 30</dd>
+        <dt>Colours</dt><dd>Black, Sage Green, Dusty Rose</dd>
+      </dl>
+    </div>
+    <div class="card">
+      <h3>Listing parity across channels</h3>
+      <div class="scroll"><table>
+        <thead><tr><th>Check</th><th>Website</th><th>Amazon</th><th>Myntra</th></tr></thead>
+        <tbody>
+          <tr><td>Shows the current bag (v2)</td><td><span class="tag t-good">Yes</span></td><td><span class="tag t-good">Yes</span></td><td><span class="tag t-exp">Old Commuter 30 photos</span></td></tr>
+          <tr><td>Volume in title</td><td><span class="tag t-good">28L</span></td><td><span class="tag t-good">28L</span></td><td><span class="tag t-exp">Likely 30L</span></td></tr>
+          <tr><td>Size on a person</td><td><span class="tag t-exp">Text only, in Specifications tab</span></td><td><span class="tag t-good">Size comparison image</span></td><td><span class="tag t-oth">To check</span></td></tr>
+          <tr><td>Customer photos</td><td><span class="tag t-exp">None</span></td><td><span class="tag t-good">2,400 reviews with photos</span></td><td><span class="tag t-oth">To check</span></td></tr>
+        </tbody>
+      </table></div>
+      <p class="small muted">Amazon passes every check and has the lowest return rate, 13 to 14%. Amazon buyers and return rules also differ, so this is a strong hint, not proof, that listings drive the gap.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 04 CUSTOMER -->
+<section class="view" id="v-customer">
+  <div class="lede">
+    <h2>What the customer sees</h2>
+    <p>Two changes on the website. Before purchase: show the real size, fit and colour, the things Amazon shows and the website does not. Before a return: ask what went wrong, fix misunderstandings, and offer an exchange.</p>
+  </div>
+  <div class="phones">
+    <div class="phone-col">
+      <div class="phone"><div class="bar-top"><i></i></div>
+        <div class="screen" id="pdp">
+          <div class="pdp-img" id="pdpImg" style="background:#8f9c88"><span>Commuter 28L</span><span id="pdpCol">Sage Green</span></div>
+          <div>
+            <h4>Commuter 28L</h4>
+            <span class="sub">Slim, structured, padded laptop compartment</span>
+          </div>
+          <div class="box">
+            <span class="t">Will my laptop fit?</span>
+            <select id="laptopSel" aria-label="Your laptop">
+              <option value="air13">MacBook Air 13-inch</option>
+              <option value="pro14">MacBook Pro 14-inch</option>
+              <option value="win156" selected>Windows laptop 15.6-inch</option>
+              <option value="air15">MacBook Air 15-inch</option>
+              <option value="pro16">MacBook Pro 16-inch</option>
+            </select>
+            <div class="fit" id="fitOut"></div>
+          </div>
+          <div class="box">
+            <span class="t">See it on someone your height</span>
+            <div class="chips" id="hChips">
+              <button class="chip" type="button" data-h="152" aria-pressed="false">5'0"</button>
+              <button class="chip" type="button" data-h="168" aria-pressed="true">5'6"</button>
+              <button class="chip" type="button" data-h="183" aria-pressed="false">6'0"</button>
+            </div>
+            <svg viewBox="0 0 300 170" width="100%" role="img" aria-label="Bag size relative to a person" id="scaleSvg">
+              <line x1="0" y1="165" x2="300" y2="165" stroke="#cfd8d6"/>
+              <g id="person"></g>
+            </svg>
+            <span class="sub">Illustration, not to scale. Real photos of the bag on people of each height replace this drawing.</span>
+          </div>
+          <div class="box">
+            <span class="t">True colour</span>
+            <div class="chips" id="colChips">
+              <button class="chip" type="button" data-c="sage" aria-pressed="true">Sage Green</button>
+              <button class="chip" type="button" data-c="rose" aria-pressed="false">Dusty Rose</button>
+            </div>
+            <div class="swatches" id="sw"></div>
+            <span class="sub">Swatch colours here are illustrative; the real ones come from unfiltered daylight photos.</span>
+            <span class="sub" id="swNote"></span>
+          </div>
+          <button class="pbtn dark" type="button">Add to cart</button>
+        </div>
+      </div>
+      <p class="cap"><b>Product page.</b> The fit checker answers the 16-inch question before purchase. The height view replaces "it looked bigger in the video". Unfiltered swatches answer "more grey than green".</p>
+    </div>
+
+    <div class="phone-col">
+      <div class="phone"><div class="bar-top"><i></i></div>
+        <div class="screen" id="ret"></div>
+      </div>
+      <p class="cap"><b>Return request.</b> Replaces the five-option dropdown. Every answer is tied to the order ID, so the reason reaches the console without anyone copying it from Freshdesk.</p>
+    </div>
+  </div>
+  <div class="card">
+    <h3>What the Breltz team receives from this return</h3>
+    <pre class="record" id="record">Pick a reason in the return screen to see the record.</pre>
+  </div>
+</section>
+
+<!-- 05 LOOP -->
+<section class="view" id="v-loop">
+  <div class="lede">
+    <h2>How it connects</h2>
+    <p>No new system to run. The pieces Breltz already has are joined on the order ID, and the result changes three things: which ads get scaled, what ads and listings are allowed to say, and what Meta learns.</p>
+  </div>
+  <div class="card">
+    <div class="scroll">
+    <svg class="diagram" viewBox="0 0 980 380" role="img" aria-label="Data sources joined by order ID feed three actions" style="min-width:760px">
+      <defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--muted);stroke:none"/></marker></defs>
+      <g>
+        <rect class="n" x="10" y="20" width="230" height="58" rx="8"/><text x="24" y="44" font-weight="600" font-size="14">Shopify orders</text><text class="m" x="24" y="64" font-size="12">UTM, ad ID, creator code, survey</text>
+        <rect class="n" x="10" y="96" width="230" height="58" rx="8"/><text x="24" y="120" font-weight="600" font-size="14">Farhan's returns sheet</text><text class="m" x="24" y="140" font-size="12">SKU, colour, QC grade, date</text>
+        <rect class="n" x="10" y="172" width="230" height="58" rx="8"/><text x="24" y="196" font-weight="600" font-size="14">New return flow + Freshdesk</text><text class="m" x="24" y="216" font-size="12">Structured reason, sub-reason, saved?</text>
+        <rect class="n" x="10" y="248" width="230" height="58" rx="8"/><text x="24" y="272" font-weight="600" font-size="14">Meta ads (read access)</text><text class="m" x="24" y="292" font-size="12">Spend and reported value by ad ID</text>
+        <rect class="n" x="10" y="318" width="230" height="50" rx="8"/><text x="24" y="340" font-weight="600" font-size="14">Amazon and Myntra reports</text><text class="m" x="24" y="358" font-size="12">Channel benchmark, monthly</text>
+      </g>
+      <rect class="h" x="360" y="140" width="220" height="100" rx="10"/>
+      <text x="380" y="176" font-weight="700" font-size="16">One row per order</text>
+      <text class="m" x="380" y="198" font-size="12.5">joined on order ID</text>
+      <text class="m" x="380" y="218" font-size="12.5">ad → order → return → reason</text>
+      <path d="M240,49 C300,49 300,175 358,175" marker-end="url(#ah)"/>
+      <path d="M240,125 C300,125 300,185 358,185" marker-end="url(#ah)"/>
+      <path d="M240,201 L358,195"  marker-end="url(#ah)"/>
+      <path d="M240,277 C300,277 300,205 358,205" marker-end="url(#ah)"/>
+      <path d="M240,343 C300,343 300,215 358,215" marker-end="url(#ah)"/>
+      <g>
+        <rect class="o" x="700" y="30" width="270" height="70" rx="8"/><text x="716" y="56" font-weight="600" font-size="14">Ads after returns</text><text class="m" x="716" y="76" font-size="12">Sneha scales on kept revenue</text>
+        <rect class="o" x="700" y="120" width="270" height="70" rx="8"/><text x="716" y="146" font-weight="600" font-size="14">Claim check + listing parity</text><text class="m" x="716" y="166" font-size="12">Copy matches the spec sheet</text>
+        <rect class="o" x="700" y="210" width="270" height="70" rx="8"/><text x="716" y="236" font-weight="600" font-size="14">Return-adjusted value to Meta</text><text class="m" x="716" y="256" font-size="12">Advantage+ learns who keeps the bag</text>
+        <rect class="o" x="700" y="300" width="270" height="70" rx="8"/><text x="716" y="326" font-weight="600" font-size="14">Monday review</text><text class="m" x="716" y="346" font-size="12">Numbers by SKU, ad, channel, customer</text>
+      </g>
+      <path d="M580,170 C640,170 640,65 698,65" marker-end="url(#ah)"/>
+      <path d="M580,182 C640,182 640,155 698,155" marker-end="url(#ah)"/>
+      <path d="M580,198 C640,198 640,245 698,245" marker-end="url(#ah)"/>
+      <path d="M580,210 C640,210 640,335 698,335" marker-end="url(#ah)"/>
+    </svg>
+    </div>
+  </div>
+
+  <h3>Who owns what</h3>
+  <div class="owners">
+    <div class="card"><b>Sneha</b><p class="small">Kept-revenue ROAS and the scaling rules. Approves only creatives that pass the claim check.</p></div>
+    <div class="card"><b>Pooja</b><p class="small">Return flow and save rate. Ticket reasons now arrive tagged with the order ID.</p></div>
+    <div class="card"><b>Farhan</b><p class="small">Keeps the weekly sheet; QC grade joins automatically. Fewer bags back, less stock stuck in reverse transit.</p></div>
+    <div class="card"><b>Aditya</b><p class="small">Monday review on numbers. Owns the free-returns decision with the real return cost in view, compared season for season so Diwali gifting returns are not mistaken for a policy effect.</p></div>
+  </div>
+
+  <h3>Pilot: Commuter 28L on the website</h3>
+  <div class="timeline">
+    <div class="card"><span class="wk">Weeks 1 to 2</span><b>Join and diagnose</b><p class="small">Join Shopify, the returns sheet, Freshdesk and Meta for the last 6 months. Separate the causes that landed together: compare return rates by vendor batch (Delhi vs Ludhiana), by ad, by COD vs prepaid, and against last year's post-Diwali gifting season. Fix the Myntra listing and the 16-inch overlay now.</p></div>
+    <div class="card"><span class="wk">Weeks 3 to 4</span><b>Fix the promise</b><p class="small">Claim check on every new creative. Fit checker, height view and true-colour swatches on the Commuter page. Ad ID in every Meta link.</p></div>
+    <div class="card"><span class="wk">Weeks 5 to 6</span><b>Close the loop</b><p class="small">New return flow live. Return-adjusted purchase value sent to Meta, with refunds for reporting. Scaling decisions moved to kept revenue.</p></div>
+    <div class="card"><span class="wk">After</span><b>Roll out</b><p class="small">Other SKUs and colours, then Myntra and Amazon listings. Revisit free returns with the numbers in hand.</p></div>
+  </div>
+</section>
+
+</main>
+
+<script>
+(function(){
+  /* ---------- routing ---------- */
+  var views = ["overview","creatives","claims","customer","loop"];
+  function show(){
+    var h = (location.hash||"").replace("#","");
+    if(views.indexOf(h) < 0) h = "overview";
+    views.forEach(function(v){
+      document.getElementById("v-"+v).classList.toggle("on", v===h);
+    });
+    document.querySelectorAll("nav a").forEach(function(a){
+      if(a.getAttribute("href")==="#"+h) a.setAttribute("aria-current","page"); else a.removeAttribute("aria-current");
+    });
+  }
+  window.addEventListener("hashchange", function(){ show(); window.scrollTo(0,0); });
+  show();
+
+  /* ---------- reasons ---------- */
+  var reasons = [
+    ["Smaller than I expected", 31, "exp"],
+    ["My laptop doesn't fit", 22, "exp"],
+    ["Colour looks different", 17, "exp"],
+    ["Ordered two colours, kept one", 12, "pol"],
+    ["Changed my mind", 10, "oth"],
+    ["Arrived damaged or faulty", 5, "oth"],
+    ["Wrong item received", 3, "oth"]
+  ];
+  var colMap = {exp:"var(--crit)", pol:"var(--warn)", oth:"var(--muted)"};
+  document.getElementById("reasonBars").innerHTML = reasons.map(function(r){
+    return '<div class="bar"><span>'+r[0]+'</span><div class="track"><div class="fill" style="width:'+(r[1]/31*100)+'%;background:'+colMap[r[2]]+'"></div></div><span class="v">'+r[1]+'%</span></div>';
+  }).join("") + '<p class="small">In this sample, <b>70%</b> of Commuter returns trace back to what the customer was shown before buying. The pilot measures the real share.</p>';
+
+  /* ---------- heatmap ---------- */
+  var heat = [
+    ["Commuter 28L Black", 26, 15, 38],
+    ["Commuter 28L Sage Green", 34, 18, 41],
+    ["Commuter 28L Dusty Rose", 33, 19, 40],
+    ["Voyager 40L", 24, 14, 29],
+    ["Kids school bag", 4, 5, 6]
+  ];
+  function heatBg(v){
+    var a = Math.min(1, v/42);
+    return "color-mix(in srgb, var(--crit) "+Math.round(a*55)+"%, var(--card))";
+  }
+  var hh = '<thead><tr><th>SKU</th><th>Website</th><th>Amazon</th><th>Myntra</th></tr></thead><tbody>';
+  heat.forEach(function(r){
+    hh += '<tr><td>'+r[0]+'</td>';
+    for(var i=1;i<4;i++) hh += '<td class="cell" style="background:'+heatBg(r[i])+'">'+r[i]+'%</td>';
+    hh += '</tr>';
+  });
+  document.getElementById("heat").innerHTML = hh + '</tbody>';
+
+  /* ---------- ads ---------- */
+  var ads = [
+    {n:"Riya: \"what's in my bag\" UGC", p:"Commuter 28L Black", m:"Code RIYA15 + ad ID", rep:5.0, ret:40, rto:7, why:"Smaller than expected", act:["fix","Re-shoot with a 15.6-inch laptop and state the creator's height"]},
+    {n:"Carousel: \"Fits up to 16-inch laptops\"", p:"Commuter 28L Black", m:"Ad ID", rep:4.6, ret:36, rto:6, why:"Laptop doesn't fit", act:["stop","Change overlay to 15.6-inch today"]},
+    {n:"Ananya: Dusty Rose sunset reel", p:"Commuter 28L Dusty Rose", m:"Code ANANYA15 + ad ID", rep:4.2, ret:38, rto:5, why:"Colour looks different", act:["fix","Add an unfiltered colour end-card"]},
+    {n:"Sage Green UGC, Advantage+", p:"Commuter 28L Sage Green", m:"Ad ID", rep:3.6, ret:33, rto:6, why:"Colour looks different", act:["fix","Add a daylight swatch frame"]},
+    {n:"Voyager 40L launch video", p:"Voyager 40L", m:"Ad ID", rep:3.4, ret:24, rto:6, why:"Smaller than expected", act:["watch","Check reasons before scaling"]},
+    {n:"Diwali sale offer", p:"Commuter 28L, all colours", m:"Ad ID", rep:3.3, ret:22, rto:8, why:"Ordered two colours", act:["watch","Watch two-colour orders"]},
+    {n:"Bag on three heights, studio video", p:"Commuter 28L Black", m:"Ad ID", rep:3.2, ret:10, rto:5, why:"Changed my mind", act:["scale","Scale: lowest returns"]},
+    {n:"Studio catalogue static", p:"Commuter 28L, all colours", m:"Ad ID", rep:2.6, ret:12, rto:6, why:"Changed my mind", act:["hold","Hold"]}
+  ];
+  ads.forEach(function(a){ a.net = +(a.rep*(1-(a.ret+a.rto)/100)).toFixed(2); });
+  var metaOrder = ads.slice().sort(function(a,b){return b.rep-a.rep;}).map(function(a){return a.n;});
+  var actTag = {fix:"t-pol", stop:"t-exp", watch:"t-oth", scale:"t-good", hold:"t-oth"};
+  function renderAds(mode){
+    var list = ads.slice().sort(function(a,b){ return mode==="net" ? b.net-a.net : b.rep-a.rep; });
+    var max = 5;
+    document.querySelector("#adTable tbody").innerHTML = list.map(function(a,i){
+      var mv = "";
+      if(mode==="net"){
+        var was = metaOrder.indexOf(a.n);
+        var d = was - i;
+        if(d>0) mv = '<span class="move up">▲'+d+'</span>';
+        else if(d<0) mv = '<span class="move down">▼'+(-d)+'</span>';
+      }
+      var lost = Math.round((1-a.net/a.rep)*100);
+      return '<tr><td><div class="rowflag"><span class="rank">'+(i+1)+'</span><div><b>'+a.n+'</b> '+mv+'<div class="small muted">'+a.p+'</div></div></div></td>'+
+        '<td class="small">'+a.m+'</td>'+
+        '<td><div class="roas">'+
+          '<div class="r"><i style="width:'+(a.rep/max*100)+'%;background:var(--line)"></i><span>'+a.rep.toFixed(1)+'x</span></div>'+
+          '<div class="r"><i style="width:'+(a.net/max*100)+'%;background:var(--accent)"></i><span><b>'+a.net.toFixed(1)+'x</b></span></div>'+
+          '<span class="small muted">'+lost+'% of reported value lost</span>'+
+        '</div></td>'+
+        '<td class="num">'+a.ret+'%</td><td class="num">'+a.rto+'%</td>'+
+        '<td class="small">'+a.why+'</td>'+
+        '<td><span class="tag '+actTag[a.act[0]]+'">'+a.act[1]+'</span></td></tr>';
+    }).join("");
+  }
+  var bM = document.getElementById("rankMeta"), bN = document.getElementById("rankNet");
+  bM.addEventListener("click", function(){ bM.setAttribute("aria-pressed","true"); bN.setAttribute("aria-pressed","false"); renderAds("meta"); });
+  bN.addEventListener("click", function(){ bN.setAttribute("aria-pressed","true"); bM.setAttribute("aria-pressed","false"); renderAds("net"); });
+  renderAds("net");
+
+  /* ---------- claim check ---------- */
+  var SPEC_MAX = 15.6;
+  function runCheck(){
+    var copy = document.getElementById("cCopy").value;
+    var lap = document.getElementById("cLaptop").value;
+    var col = document.getElementById("cColour").value;
+    var grade = document.getElementById("cGrade").value;
+    var scale = document.getElementById("cScale").checked;
+    var out = [];
+    var inches = (copy.match(/(\d{2}(?:\.\d)?)\s*(?:-|\s)?\s*(?:inch|in\b|"|”|″)/gi)||[]).map(function(s){return parseFloat(s);});
+    var over = inches.filter(function(x){return x>SPEC_MAX;});
+    if(over.length) out.push(["fail","Laptop claim says "+over[0]+"-inch. Spec sheet allows up to 15.6-inch. A 16-inch laptop goes in tight and strains the zip. Change the copy to \"Fits laptops up to 15.6-inch\"."]);
+    else if(inches.length) out.push(["pass","Laptop claim ("+inches[0]+"-inch) is within the spec."]);
+    else out.push(["pass","No laptop size claim in the copy."]);
+    var lit = (copy.match(/(\d{2})\s*(?:l\b|litre|liter)/i));
+    if(lit && parseInt(lit[1],10)!==28) out.push(["fail","Copy says "+lit[1]+" litres. The Commuter 28L is 28 litres; 30 litres was the old Commuter 30."]);
+    if(/sleeve/i.test(copy)) out.push(["fail","Copy mentions a laptop sleeve. The new Commuter has a built-in compartment; the zip-in sleeve was the old model."]);
+    if(lap==="13") out.push(["warn","The video shows a 13-inch laptop, which makes the bag look roomier than it will feel with a 15.6-inch laptop. Add a caption with the laptop size, or re-shoot with a 15.6-inch."]);
+    else if(lap==="16") out.push(["fail","The video shows a 16-inch laptop. It goes in tight and the zip strains; customers will expect an easy fit."]);
+    else if(lap==="15.6") out.push(["pass","Laptop in the video matches the official maximum."]);
+    else if(lap==="none" && inches.length) out.push(["warn","The copy makes a laptop claim but no laptop is shown. Show a 15.6-inch laptop going in so the claim can be seen, not just read."]);
+    if(grade==="warm" && col!=="Black") out.push(["warn",col+" is the colour customers already say looks different in person. A warm filter widens that gap. Add a 2-second unfiltered end-card in daylight."]);
+    else out.push(["pass","Colour grading is fine for "+col+"."]);
+    if(!scale) out.push(["warn","No size reference. \"It looked bigger in the video\" is a common ticket. Show the bag on a person and state their height."]);
+    else out.push(["pass","Size reference is visible."]);
+    var order = {fail:0, warn:1, pass:2};
+    out.sort(function(a,b){ return order[a[0]]-order[b[0]]; });
+    var fails = out.filter(function(o){return o[0]==="fail";}).length;
+    var warns = out.filter(function(o){return o[0]==="warn";}).length;
+    var v = document.getElementById("verdict");
+    function n(k,w){ return k+" "+w+(k>1?"s":""); }
+    if(fails){ v.textContent = "Blocked: "+n(fails,"claim")+" to fix"+(warns?", "+n(warns,"warning"):""); v.style.color="var(--crit)"; }
+    else if(warns){ v.textContent = "Approve after "+n(warns,"fix")+": see warnings"; v.style.color="var(--warn)"; }
+    else { v.textContent = "Ready to approve"; v.style.color="var(--good)"; }
+    var icon = {fail:"✕", warn:"!", pass:"✓"};
+    document.getElementById("results").innerHTML = out.map(function(o){
+      return '<li class="'+o[0]+'"><b>'+icon[o[0]]+'</b><span>'+o[1]+'</span></li>';
+    }).join("");
+  }
+  document.getElementById("runCheck").addEventListener("click", runCheck);
+  ["cCopy","cLaptop","cColour","cGrade","cScale"].forEach(function(id){
+    document.getElementById(id).addEventListener("change", runCheck);
+  });
+  runCheck();
+
+  /* ---------- PDP ---------- */
+  var fits = {
+    air13:["ok","Roomy fit","Plenty of space left for a lunch box and bottle."],
+    pro14:["ok","Good fit","Slides into the padded compartment with room to spare."],
+    win156:["ok","Fits: this is the size the bag is built for","Use the built-in padded laptop compartment, not the main section."],
+    air15:["ok","Good fit","Within the 15.6-inch compartment."],
+    pro16:["tight","Tight fit, not recommended","It goes in, but the zip strains. The Commuter 28L is made for laptops up to 15.6-inch."]
+  };
+  function renderFit(){
+    var f = fits[document.getElementById("laptopSel").value];
+    var el = document.getElementById("fitOut");
+    el.className = "fit "+f[0];
+    el.innerHTML = "<b>"+f[1]+"</b>"+f[2];
+  }
+  document.getElementById("laptopSel").addEventListener("change", renderFit);
+  renderFit();
+
+  function renderPerson(hcm){
+    /* illustration only; bag height is a placeholder until real dimensions are used */
+    var px = 0.85;
+    var H = hcm*px, top = 165-H;
+    var head = H*0.13;
+    var cx = 110;
+    var bagH = 45*px, bagW = 30*px;
+    var bagTop = top + H*0.2;
+    var g = '';
+    g += '<circle cx="'+cx+'" cy="'+(top+head/2)+'" r="'+(head/2)+'" fill="#c9d2d0"/>';
+    g += '<rect x="'+(cx-H*0.11)+'" y="'+(top+head+2)+'" width="'+(H*0.22)+'" height="'+(H*0.42)+'" rx="8" fill="#c9d2d0"/>';
+    g += '<rect x="'+(cx-H*0.09)+'" y="'+(top+head+H*0.42)+'" width="'+(H*0.08)+'" height="'+(165-(top+head+H*0.42))+'" rx="4" fill="#c9d2d0"/>';
+    g += '<rect x="'+(cx+H*0.01)+'" y="'+(top+head+H*0.42)+'" width="'+(H*0.08)+'" height="'+(165-(top+head+H*0.42))+'" rx="4" fill="#c9d2d0"/>';
+    g += '<rect x="'+(cx+H*0.11)+'" y="'+bagTop+'" width="'+bagW+'" height="'+bagH+'" rx="6" fill="'+(curCol==="rose"?"#b5948c":"#8f9c88")+'"/>';
+    g += '<text x="'+(cx+H*0.11+bagW+8)+'" y="'+(bagTop+14)+'" font-size="11" fill="#5f6b69">Commuter 28L</text>';
+    g += '<text x="'+(cx+H*0.11+bagW+8)+'" y="'+(bagTop+28)+'" font-size="11" fill="#5f6b69">on a '+document.querySelector('#hChips [aria-pressed="true"]').textContent+' person</text>';
+    document.getElementById("person").innerHTML = g;
+  }
+  var curH = 168, curCol = "sage";
+  document.querySelectorAll("#hChips .chip").forEach(function(b){
+    b.addEventListener("click", function(){
+      document.querySelectorAll("#hChips .chip").forEach(function(x){x.setAttribute("aria-pressed","false");});
+      b.setAttribute("aria-pressed","true");
+      curH = +b.dataset.h; renderPerson(curH);
+    });
+  });
+
+  var swData = {
+    sage:{name:"Sage Green", s:[["Studio photo","#93a587"],["Daylight, unfiltered","#9a9f93"],["Office light","#8d918a"]], note:"In daylight it reads greyer than in the studio photo. Customers say \"more grey than green\"; this shows it before they buy.", pdp:"#8f9c88"},
+    rose:{name:"Dusty Rose", s:[["Studio photo","#c79c9a"],["Daylight, unfiltered","#b59a8e"],["Office light","#a88d84"]], note:"Indoors it leans brown. Customers say \"more brown in person\"; the sunset reel showed it warmer still.", pdp:"#b5948c"}
+  };
+  function renderSw(){
+    var d = swData[curCol];
+    document.getElementById("sw").innerHTML = d.s.map(function(s){return '<div class="sw" style="background:'+s[1]+'">'+s[0]+'</div>';}).join("");
+    document.getElementById("swNote").textContent = d.note;
+    document.getElementById("pdpImg").style.background = d.pdp;
+    document.getElementById("pdpCol").textContent = d.name;
+    renderPerson(curH);
+  }
+  document.querySelectorAll("#colChips .chip").forEach(function(b){
+    b.addEventListener("click", function(){
+      document.querySelectorAll("#colChips .chip").forEach(function(x){x.setAttribute("aria-pressed","false");});
+      b.setAttribute("aria-pressed","true");
+      curCol = b.dataset.c; renderSw();
+    });
+  });
+  renderSw();
+
+  /* ---------- Return flow ---------- */
+  var ret = document.getElementById("ret");
+  var state = {};
+  var order = '<div class="order"><div class="thumb" style="background:#8f9c88"></div><div><b>Commuter 28L, Sage Green</b><div class="sub">Order BR-48213 · Delivered 3 days ago · Prepaid</div></div></div>';
+  var top = '<div><span class="step-k">Return request</span><h4>What\'s not right?</h4></div>';
+  var mainReasons = [
+    ["small","It's smaller than I expected"],
+    ["laptop","My laptop doesn't fit"],
+    ["colour","The colour looks different"],
+    ["multi","I ordered more than one colour"],
+    ["damaged","It arrived damaged or faulty"],
+    ["other","Something else"]
+  ];
+  function step1(){
+    state = {};
+    ret.innerHTML = order + top + '<div class="chips" style="flex-direction:column;align-items:stretch">' +
+      mainReasons.map(function(r){return '<button class="chip" type="button" data-r="'+r[0]+'" style="text-align:left;border-radius:10px;padding:11px 12px">'+r[1]+'</button>';}).join("") +
+      '</div><span class="sub">Returns stay free. Your answer helps us fix the product page for the next customer.</span>';
+    ret.querySelectorAll("[data-r]").forEach(function(b){ b.addEventListener("click", function(){ state.reason=b.dataset.r; state.label=b.textContent; step2(); }); });
+    renderRecord();
+  }
+  function done(outcome, sub){
+    state.outcome = outcome;
+    var saved = outcome!=="Return booked";
+    ret.innerHTML = order + '<div class="box" style="background:'+(saved?"#e1f2e7":"#f3f5f4")+'"><span class="t">'+outcome+'</span><span class="sub">'+sub+'</span></div><button class="pbtn light" type="button" id="again">Start over</button>';
+    document.getElementById("again").addEventListener("click", step1);
+    renderRecord();
+  }
+  function step2(){
+    var r = state.reason, h = order + '<div><span class="step-k">Step 2 of 2</span><h4>'+state.label+'</h4></div>';
+    if(r==="laptop"){
+      h += '<div class="box"><span class="t">Which laptop are you using?</span><select id="rl" aria-label="Your laptop"><option value="13">13 to 14-inch</option><option value="15.6" selected>15.6-inch</option><option value="16">16-inch</option></select><div id="rlOut"></div></div>';
+      ret.innerHTML = h;
+      var sel = document.getElementById("rl");
+      function lap(){
+        state.sub = sel.value+"-inch laptop";
+        var o = document.getElementById("rlOut");
+        if(sel.value!=="16"){
+          o.innerHTML = '<div class="fit ok"><b>It should fit</b>Many customers first try the main section. Use the built-in padded laptop compartment instead.</div><button class="pbtn dark" type="button" id="k1">That worked, I\'ll keep it</button><button class="pbtn light" type="button" id="k2">Still doesn\'t fit, return it</button>';
+          document.getElementById("k1").onclick = function(){ done("Kept: return cancelled","Glad it fits. We've noted the compartment tip for the product page."); };
+          document.getElementById("k2").onclick = function(){ done("Return booked","Pickup in 2 to 3 days. Refund when it reaches us."); };
+        } else {
+          o.innerHTML = '<div class="fit tight"><b>You\'re right, it\'s a tight fit</b>The Commuter 28L is made for laptops up to 15.6-inch. Sorry if the ad suggested otherwise.</div><button class="pbtn dark" type="button" id="k3">Return it, free pickup</button><button class="pbtn light" type="button" id="k4">Chat with us about other options</button>';
+          document.getElementById("k3").onclick = function(){ done("Return booked","Pickup in 2 to 3 days. Refund when it reaches us."); };
+          document.getElementById("k4").onclick = function(){ done("Handed to support","Pooja's team picks up the chat with your order already attached."); };
+        }
+        renderRecord();
+      }
+      sel.addEventListener("change", lap); lap(); return;
+    }
+    if(r==="small"){
+      h += '<div class="box"><span class="t">Which part felt small?</span><div class="chips" id="sc"><button class="chip" type="button">The overall size</button><button class="chip" type="button">The main compartment</button><button class="chip" type="button">The laptop section</button></div></div><div class="box"><span class="t">Where did you see it before buying?</span><div class="chips" id="sw2"><button class="chip" type="button">Instagram ad or reel</button><button class="chip" type="button">Our website photos</button><button class="chip" type="button">A friend</button></div></div><button class="pbtn dark" type="button" id="go">Book free return</button><button class="pbtn light" type="button" id="ex">Exchange for another bag instead</button>';
+      ret.innerHTML = h;
+      ["sc","sw2"].forEach(function(id){ ret.querySelectorAll("#"+id+" .chip").forEach(function(b){ b.onclick=function(){ ret.querySelectorAll("#"+id+" .chip").forEach(function(x){x.setAttribute("aria-pressed","false");}); b.setAttribute("aria-pressed","true"); if(id==="sc") state.sub=b.textContent; else state.seen=b.textContent; renderRecord(); }; }); });
+      document.getElementById("go").onclick=function(){ done("Return booked","Pickup in 2 to 3 days. Refund when it reaches us."); };
+      document.getElementById("ex").onclick=function(){ done("Exchange booked","We'll pick this one up when we deliver your new bag."); };
+      renderRecord(); return;
+    }
+    if(r==="colour"){
+      h += '<div class="box"><span class="t">How does it look different?</span><div class="chips" id="cc"><button class="chip" type="button">More grey than green</button><button class="chip" type="button">Duller or darker</button><button class="chip" type="button">Something else</button></div></div><div class="swatches"><div class="sw" style="background:#93a587">Studio photo</div><div class="sw" style="background:#9a9f93">Daylight</div><div class="sw" style="background:#8d918a">Office light</div></div><span class="sub">How Sage Green looks in different light, unfiltered (illustrative colours).</span><button class="pbtn dark" type="button" id="ex">Exchange for Black, free</button><button class="pbtn light" type="button" id="go">Return it</button>';
+      ret.innerHTML = h;
+      ret.querySelectorAll("#cc .chip").forEach(function(b){ b.onclick=function(){ ret.querySelectorAll("#cc .chip").forEach(function(x){x.setAttribute("aria-pressed","false");}); b.setAttribute("aria-pressed","true"); state.sub=b.textContent; renderRecord(); }; });
+      document.getElementById("go").onclick=function(){ done("Return booked","Pickup in 2 to 3 days. Refund when it reaches us."); };
+      document.getElementById("ex").onclick=function(){ done("Exchange booked","Black is on its way; we'll collect the Sage Green at the door."); };
+      renderRecord(); return;
+    }
+    if(r==="multi"){
+      state.sub = "Bought two colours to compare";
+      h += '<div class="box"><span class="t">No problem. Which one are you keeping?</span><div class="chips"><button class="chip" type="button" aria-pressed="true">Black</button><button class="chip" type="button" aria-pressed="false">Sage Green</button></div><span class="sub">Next time, the true-colour view on the product page can help you choose before ordering.</span></div><button class="pbtn dark" type="button" id="go">Return Sage Green, free pickup</button>';
+      ret.innerHTML = h;
+      document.getElementById("go").onclick=function(){ done("Return booked","Pickup in 2 to 3 days. Refund when it reaches us."); };
+      renderRecord(); return;
+    }
+    if(r==="damaged"){
+      state.sub = "Photo attached";
+      h += '<div class="box"><span class="t">Add a photo of the problem</span><label class="sub" for="ph" style="font-weight:400">Helps us check the vendor batch</label><input type="file" id="ph" accept="image/*"></div><button class="pbtn dark" type="button" id="go">Send a replacement first</button><button class="pbtn light" type="button" id="go2">Refund instead</button>';
+      ret.innerHTML = h;
+      document.getElementById("go").onclick=function(){ done("Replacement on its way","We'll collect the damaged bag at delivery. QC will check the batch."); };
+      document.getElementById("go2").onclick=function(){ done("Return booked","Pickup in 2 to 3 days. Refund when it reaches us."); };
+      renderRecord(); return;
+    }
+    h += '<div class="box"><label class="t" for="ot">Tell us in a few words</label><input type="text" id="ot" placeholder="e.g. the straps are shorter than I wanted"></div><button class="pbtn dark" type="button" id="go">Book free return</button>';
+    ret.innerHTML = h;
+    document.getElementById("ot").addEventListener("input", function(e){ state.sub = e.target.value; renderRecord(); });
+    document.getElementById("go").onclick=function(){ done("Return booked","Pickup in 2 to 3 days. Refund when it reaches us."); };
+    renderRecord();
+  }
+  var codes = {small:"EXPECT_SIZE", laptop:"EXPECT_LAPTOP_FIT", colour:"EXPECT_COLOUR", multi:"POLICY_BRACKETING", damaged:"QUALITY_DAMAGE", other:"OTHER"};
+  function renderRecord(){
+    var el = document.getElementById("record");
+    if(!state.reason){ el.textContent = "Pick a reason in the return screen to see the record."; return; }
+    var rec = {
+      order_id: "BR-48213",
+      sku: "COMMUTER28-SAGE",
+      channel: "website",
+      payment: "prepaid",
+      customer: "first-time",
+      ad_source: "code RIYA15 · ad 6201… (Riya UGC)",
+      reason_code: codes[state.reason],
+      reason_detail: state.sub || null,
+      seen_before_buying: state.seen || null,
+      outcome: state.outcome || "in progress",
+      qc_grade: "joins from Farhan's sheet on arrival",
+      sent_to_meta: state.outcome==="Return booked" ? "refund event for order BR-48213 (reporting); keep-rate model updated" : "nothing yet"
+    };
+    el.textContent = JSON.stringify(rec, null, 2);
+  }
+  step1();
+})();
+</script>
+</body>
+</html>
